@@ -1,0 +1,214 @@
+# RatePal App Screen Structure and User Workflows
+
+## Authentication Screens
+
+### 1. Welcome/Splash Screen
+- App logo (Stello mascot)
+- "Sign In" and "Create Account" buttons
+- Brief app value proposition
+
+### 2. Sign In Screen
+- Email/password fields
+- Social login options (Google/Apple)
+- "Forgot Password" link
+- "Create Account" link
+
+### 3. Sign Up Screen
+- Email/password fields
+- Social signup options (Google/Apple)
+- Terms & conditions agreement
+- "Already have an account?" link
+
+### 4. Password Reset Screen
+- Email field
+- Submit button
+- Return to sign in
+
+## Onboarding Screens
+
+### 1. Welcome Onboarding
+- Introduction to RatePal with Stello mascot
+- Explanation of app purpose
+- "Get Started" button
+
+### 2. Feature Highlights
+- Carousel explaining key features:
+  - Private lists
+  - Custom fields
+  - Voice memos with AI
+  - Templates
+
+### 3. Template Selection
+- List of pre-built templates (Restaurants, Books, Movies, etc.)
+- Option to skip and create from scratch
+- Explanation of free vs. premium features
+
+## Main App Screens
+
+### 1. Home/Dashboard (Tab 1)
+- Welcome message with user name
+- Quick statistics (total lists, recent entries)
+- Recently added entries
+- Button to create new entry (direct access to Create Entry Screen)
+- Premium upgrade banner (for free users)
+
+### 2. Lists Overview (Tab 2)
+- Grid/list of user's lists with thumbnails
+- Each list shows:
+  - Title
+  - Number of entries
+  - Last updated date
+- "Create New List" button (disabled/limited for free users)
+- "Create New Entry" button (direct access to Create Entry Screen)
+- Filter/sort options
+
+### 3. Profile/Settings (Tab 3)
+- User profile information
+- Subscription status
+- App settings
+- Export options (premium)
+- Help/Support
+- Logout
+
+## List Management Workflow
+
+### 1. Create List Screen
+- List name field
+- Optional description
+- Template selection
+- Custom fields definition:
+  - Field name
+  - Field type (text, number, date, dropdown, image)
+  - Required/optional toggle
+- Preview of list structure
+- "Create" button
+- Free user limitations notice (max 1 list, 3 fields)
+
+### 2. List Details Screen
+- List header with:
+  - List name
+  - Description
+  - Entry count
+  - Create date
+- Entries in list (sortable/filterable)
+- "Add Entry" button
+- List settings/edit button (premium only)
+- Export button (premium only)
+
+### 3. List Settings Screen (Premium)
+- Edit list name/description
+- Manage custom fields
+- Delete list option
+- Sharing options (future feature)
+
+## Entry Management Workflow
+
+### 1. Create Entry Screen
+- Entry title field
+- Rating slider (0-100)
+- Description field
+- Custom fields based on list definition
+- Photo upload button (limited for free users)
+- Voice memo recording option with:
+  - Record button
+  - Recording visualization
+  - Stop/pause controls
+  - Recording length timer
+  - "Process with AI" button
+  - AI credits remaining indicator (for free users)
+- Text input alternative
+- "Save" button
+
+
+### 2. AI Processing Result Screen
+- Generated description
+- Suggested rating
+- Extracted custom field values
+- Edit options for all fields
+- Complete transcript view
+- "Save" or "Edit" buttons
+
+### 3. Edit Entry Screen
+- Same layout as Create Entry Screen but with pre-filled data
+- Entry title field
+- Rating slider (0-100)
+- Description field
+- Custom fields based on list definition
+- Photo management (view/delete/add)
+- "Update" button
+- "Cancel" button
+
+### 4. Entry Details Screen
+- Entry title and rating
+- Photos with gallery view
+- Description
+- Custom fields with values
+- Edit button
+- Delete option
+- Share option (future feature)
+- Date created/modified
+
+## Premium/Subscription Screens
+
+### 1. Premium Features Screen
+- Comparison table (Free vs. Premium)
+- Feature limitations explanation
+- Pricing options (monthly/yearly)
+- 7-day free trial details
+- "Subscribe" button
+
+### 2. Payment Screen
+- Stripe integration
+- Payment method selection
+- Subscription confirmation
+- Terms & billing information
+
+### 3. Subscription Management Screen
+- Current plan details
+- Billing history
+- Cancel subscription option
+- Change plan option
+
+## Settings Screens
+
+### 1. Profile Settings
+- Edit profile information
+- Change password
+- Linked accounts
+- Delete account option
+
+### 2. App Settings
+- Theme selection (light/dark)
+- Notification preferences
+- Data usage settings
+- Export options (premium)
+
+### 3. Help & Support
+- FAQ section
+- Contact support
+- Tutorial videos
+- App tour restart option
+
+## Typical User Journeys
+
+### New User Flow
+1. Welcome Screen → Sign Up → Onboarding → Template Selection → First List Creation → Home Dashboard
+
+### Restaurant Rating Flow
+1. Home Dashboard → Lists → Restaurant List → Add Entry → Use Text Input → Save
+2. OR: Home Dashboard → Lists → Restaurant List → Add Entry → Use Voice Memo → AI Processing → Edit → Save
+
+### Regular User Flow
+1. Sign In → Home Dashboard → Lists → Specific List → View/Add Entries
+
+### Free to Premium Conversion Flow
+1. Encounter Limitation → Premium Features Screen → Payment → Expanded Features Unlocked
+
+### Template-Based List Creation
+1. Lists Screen → Create List → Select Template → Customize Fields → Create
+
+### Voice Memo to Entry Flow
+1. Lists Screen → Select List → Add Entry → Use Voice Memo → Record → AI Processing → Review Generated Content → Edit if Needed → Save
+
+### Entry Browsing and Filtering
+1. Lists Screen → Select List → View Entries → Filter/Sort → Select Entry → View Details
