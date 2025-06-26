@@ -40,7 +40,7 @@
 
 1. **Implement NativeWind Styling Framework**
    - Replace React Native Paper with NativeWind
-   - Create base component library with glassmorphism effects
+   - Create base component library with modern UI effects
    - Establish dark mode as primary design with light mode option
 
 2. **Add Moti/Reanimated Animations**

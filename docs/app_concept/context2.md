@@ -108,7 +108,7 @@
 
 * **Frontend**: React Native mit **Expo**
 * **UI Framework**: **NativeWind** (Tailwind CSS für React Native) mit **Moti** für Animationen
-* **Design-Stil**: Glassmorphismus, Dark Mode First, randlose Designs und individuelle Illustrationen
+* **Design-Stil**: Dark Mode First und individuelle Illustrationen
 * **Code-Editor**: Cursor AI
 * **Backend & DB**: Supabase
 * **AI**: OpenAI Whisper & GPT-4 APIs

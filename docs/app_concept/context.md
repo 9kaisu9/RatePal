@@ -48,7 +48,7 @@ RatePal is a minimalist mobile app for privately rating personal experiences (e.
 ### Modern UI Approach
 - **Design System**: Utility-first CSS with NativeWind for modern, customizable interfaces
 - **Animations**: Moti/Reanimated for fluid micro-interactions and transitions
-- **Visual Style**: Focus on glassmorphism, dark mode first, borderless design, and custom illustrations
+- **Visual Style**: Focus on dark mode first and custom illustrations
 - **Experience**: Emphasis on micro-interactions and subtle haptic feedback
 
 ### Deployment  

@@ -474,7 +474,7 @@ Premium users (users.is_premium = true) can access advanced features like:
 
 With NativeWind styling and Moti animations, the app provides:
 
-- Glassmorphic card designs for lists and entries
+- Modern card designs for lists and entries
 - Fluid micro-animations for rating components
 - Dark mode first design with high contrast
 - Smooth transitions between screens
