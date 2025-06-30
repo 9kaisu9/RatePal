@@ -9,9 +9,13 @@ export default function AppLayout() {
           backgroundColor: '#111827', // bg-gray-900
         },
         headerTintColor: '#fff',
+        headerShadowVisible: false,
         tabBarStyle: {
           backgroundColor: '#111827',
           borderTopColor: '#374151', // border-gray-700
+          position: 'absolute',
+          height: 80,
+          paddingBottom: 32
         },
         tabBarActiveTintColor: '#3B82F6', // text-blue-500
         tabBarInactiveTintColor: '#9CA3AF', // text-gray-400
@@ -25,7 +29,7 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
-        name="lists"
+        name="(lists)"
         options={{
           title: 'Lists',
           tabBarIcon: ({ color }) => <Text style={{ color }}>📝</Text>,

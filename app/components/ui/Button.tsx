@@ -5,7 +5,7 @@ const StyledPressable = styled(Pressable);
 const StyledText = styled(Text);
 
 interface ButtonProps {
-  onPress: () => void;
+  onPress?: () => void;
   variant?: 'primary' | 'secondary' | 'outline';
   children: string;
   className?: string;

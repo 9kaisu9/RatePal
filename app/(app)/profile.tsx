@@ -20,8 +20,14 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-900">
-      <ScrollView className="flex-1 p-6">
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-900">
+      <ScrollView 
+        className="flex-1" 
+        contentContainerStyle={{ 
+          padding: 24,
+          paddingBottom: 100
+        }}
+      >
         {/* Profile Header */}
         <View className="items-center mb-8">
           <View className="w-24 h-24 bg-gray-800 rounded-full items-center justify-center mb-4">

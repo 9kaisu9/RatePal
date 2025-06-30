@@ -12,6 +12,8 @@ interface InputProps {
   onChangeText: (text: string) => void;
   secureTextEntry?: boolean;
   className?: string;
+  keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
+  required?: boolean;
 }
 
 export function Input({
@@ -21,11 +23,16 @@ export function Input({
   onChangeText,
   secureTextEntry,
   className = '',
+  keyboardType = 'default',
+  required = false,
 }: InputProps) {
   return (
     <StyledView className={`mb-4 ${className}`}>
       {label && (
-        <StyledText className="text-gray-300 mb-2 text-sm">{label}</StyledText>
+        <StyledText className="text-gray-300 mb-2 text-sm">
+          {label}
+          {required && <Text className="text-red-500"> *</Text>}
+        </StyledText>
       )}
       <StyledTextInput
         className="bg-gray-800 text-white px-4 py-3 rounded-lg border border-gray-700"
@@ -34,6 +41,7 @@ export function Input({
         value={value}
         onChangeText={onChangeText}
         secureTextEntry={secureTextEntry}
+        keyboardType={keyboardType}
       />
     </StyledView>
   );
