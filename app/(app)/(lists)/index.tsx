@@ -4,30 +4,14 @@ import { Link, router } from 'expo-router';
 import { Button } from '../../components/ui/Button';
 
 // Placeholder data
-const lists = [
-  {
-    id: '1',
-    name: 'Favorite Restaurants',
-    entriesCount: 12,
-    lastUpdated: '2 days ago',
-  },
-  {
-    id: '2',
-    name: 'Movies to Watch',
-    entriesCount: 8,
-    lastUpdated: '1 week ago',
-  },
-  {
-    id: '3',
-    name: 'Books Read in 2025',
-    entriesCount: 4,
-    lastUpdated: '3 days ago',
-  },
-];
+import { getMockData } from '../../data/mockData';
+
+// Get lists from mock data
+const lists = getMockData.getLists();
 
 export default function ListsScreen() {
   return (
-    <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-900">
+    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-gray-900">
       <ScrollView 
         className="flex-1" 
         contentContainerStyle={{ 
@@ -44,29 +28,32 @@ export default function ListsScreen() {
 
         <View className="space-y-4 mb-8">
           {lists.map((list) => (
-            <Link
+            <Pressable
               key={list.id}
-              href={{ pathname: '/[id]/index', params: { id: list.id } }}
-              asChild
+              className="p-4 rounded-lg bg-gray-800 border border-gray-700"
+              onPress={() => router.push({
+                pathname: '/(app)/(lists)/[id]',
+                params: { id: list.id }
+              })}
             >
-              <Pressable
-                className="p-4 rounded-lg bg-gray-800 border border-gray-700"
-              >
                 <View className="flex-row justify-between items-center">
                   <View>
-                    <Text className="text-lg font-semibold text-white">
-                      {list.name}
-                    </Text>
-                    <Text className="text-gray-400">
-                      {list.entriesCount} entries • {list.lastUpdated}
-                    </Text>
+                    <Text className="text-lg font-semibold text-white">{list.title}</Text>
+                    <Text className="text-gray-400">{list.description}</Text>
+                    <Text className="text-gray-500 text-sm mt-2">{new Date(list.updatedAt).toLocaleDateString()}</Text>
                   </View>
-                  <Link href={{ pathname: '/[id]/index', params: { id: list.id } }} asChild>
-                    <Button variant="outline">View</Button>
-                  </Link>
+                  <Button 
+                    variant="outline" 
+                    className="ml-4"
+                    onPress={() => router.push({
+                      pathname: '/(app)/(lists)/[id]',
+                      params: { id: list.id }
+                    })}
+                  >
+                    View
+                  </Button>
                 </View>
-              </Pressable>
-            </Link>
+            </Pressable>
           ))}
         </View>
 

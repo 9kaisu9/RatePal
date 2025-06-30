@@ -5,9 +5,7 @@ export default function AppLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerStyle: {
-          backgroundColor: '#111827', // bg-gray-900
-        },
+        headerShown: false,
         headerTintColor: '#fff',
         headerShadowVisible: false,
         tabBarStyle: {

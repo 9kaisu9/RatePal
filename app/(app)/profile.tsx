@@ -13,14 +13,17 @@ const MenuItem = ({ title, icon, onPress }: { title: string; icon: string; onPre
   </Pressable>
 );
 
+import { getMockData } from '../data/mockData';
+
 export default function ProfileScreen() {
+  const currentUser = getMockData.getCurrentUser();
   const handleSignOut = () => {
     // TODO: Implement sign out logic
     console.log('Sign out');
   };
 
   return (
-    <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-900">
+    <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-gray-900">
       <ScrollView 
         className="flex-1" 
         contentContainerStyle={{ 
@@ -33,13 +36,14 @@ export default function ProfileScreen() {
           <View className="w-24 h-24 bg-gray-800 rounded-full items-center justify-center mb-4">
             <Text className="text-4xl">👤</Text>
           </View>
-          <Text className="text-xl font-bold text-white mb-1">John Doe</Text>
-          <Text className="text-gray-400">john@example.com</Text>
+          <Text className="text-2xl font-bold text-white">{currentUser.name || 'Anonymous'}</Text>
+          <Text className="text-gray-400">{currentUser.email}</Text>
         </View>
 
         {/* Subscription Status */}
         <View className="bg-blue-900/50 p-4 rounded-lg mb-8">
-          <Text className="text-white font-semibold mb-2">Free Plan</Text>
+          <Text className="text-white font-semibold">{currentUser.isPremium ? 'Premium Plan' : 'Free Plan'}</Text>
+          {!currentUser.isPremium && <Text className="text-gray-400">Upgrade to Premium</Text>}
           <Text className="text-gray-300 mb-4">
             Upgrade to Premium to unlock all features!
           </Text>
