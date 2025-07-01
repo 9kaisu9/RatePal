@@ -1,11 +1,15 @@
 import { View, Text, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '../components/ui/Button';
 import { getMockData } from '../data/mockData';
+import { useState } from 'react';
+import { ListPicker } from '../components/ListPicker';
 
 export default function HomeScreen() {
+  const [isListPickerVisible, setIsListPickerVisible] = useState(false);
+  
   const lists = getMockData.getLists();
   const allEntries = lists.flatMap(list => getMockData.getEntriesByListId(list.id));
   const recentEntries = lists
@@ -17,6 +21,23 @@ export default function HomeScreen() {
   const avgRating = allEntries
     .filter(entry => entry.rating !== null)
     .reduce((sum, entry) => sum + (entry.rating || 0), 0) / allEntries.length || 0;
+    
+  const handleSelectList = (listId: string) => {
+    setIsListPickerVisible(false);
+    router.push({
+      pathname: '/(app)/(lists)/[id]/entry/create',
+      params: { id: listId }
+    });
+  };
+  
+  const handleCreateEntryPress = () => {
+    if (lists.length > 0) {
+      setIsListPickerVisible(true);
+    } else {
+      // If no lists exist, navigate to create list screen
+      router.push('/(app)/(lists)/create');
+    }
+  };
   return (
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-gray-900">
       <ScrollView 
@@ -92,15 +113,23 @@ export default function HomeScreen() {
           </View>
         </View>
         */}
-
-        <Button
-          onPress={() => console.log('Create new entry')}
-          variant="primary"
-          className="mt-6"
-        >
-          Create New Entry
-        </Button>
+        
       </ScrollView>
+      
+      {/* Floating Action Button for quick entry creation */}
+      <Pressable 
+        onPress={handleCreateEntryPress}
+        className="absolute bottom-24 right-6 w-16 h-16 rounded-full bg-blue-600 items-center justify-center shadow-2xl shadow-blue-900/30 active:scale-95 active:bg-blue-700 transition-all duration-200"
+      >
+        <MaterialCommunityIcons name="plus" size={28} color="white" />
+      </Pressable>
+        
+      {/* List Picker Modal */}
+      <ListPicker 
+        isVisible={isListPickerVisible} 
+        onClose={() => setIsListPickerVisible(false)}
+        onSelectList={handleSelectList}
+      />
     </SafeAreaView>
   );
 }

@@ -1,36 +1,44 @@
 import { Text, Pressable } from 'react-native';
 import { styled } from 'nativewind';
+import { ReactNode } from 'react';
 
 const StyledPressable = styled(Pressable);
 const StyledText = styled(Text);
 
-interface ButtonProps {
+export interface ButtonProps {
   onPress?: () => void;
   variant?: 'primary' | 'secondary' | 'outline';
-  children: string;
+  children: ReactNode;
   className?: string;
+  disabled?: boolean;
 }
 
-export function Button({ onPress, variant = 'primary', children, className = '' }: ButtonProps) {
-  const baseStyle = 'px-6 py-3 rounded-lg active:opacity-80';
+export function Button({ onPress, variant = 'primary', children, className = '', disabled = false }: ButtonProps) {
+  const baseStyle = 'px-6 py-3 rounded-lg';
   const variants = {
-    primary: 'bg-blue-600',
-    secondary: 'bg-gray-600',
-    outline: 'border border-gray-300',
+    primary: disabled ? 'bg-blue-600/50' : 'bg-blue-600 active:opacity-80',
+    secondary: disabled ? 'bg-gray-600/50' : 'bg-gray-600 active:opacity-80',
+    outline: disabled ? 'border border-gray-500/50' : 'border border-gray-300 active:opacity-80',
   };
 
   return (
     <StyledPressable
-      onPress={onPress}
+      onPress={disabled ? undefined : onPress}
       className={`${baseStyle} ${variants[variant]} ${className}`}
     >
-      <StyledText
-        className={`text-center font-semibold ${
-          variant === 'outline' ? 'text-gray-300' : 'text-white'
-        }`}
-      >
-        {children}
-      </StyledText>
+      {typeof children === 'string' ? (
+        <StyledText
+          className={`text-center font-semibold ${
+            variant === 'outline' 
+              ? (disabled ? 'text-gray-500' : 'text-gray-300')
+              : (disabled ? 'text-white/70' : 'text-white')
+          }`}
+        >
+          {children}
+        </StyledText>
+      ) : (
+        children
+      )}
     </StyledPressable>
   );
 }

@@ -14,6 +14,9 @@ interface InputProps {
   className?: string;
   keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
   required?: boolean;
+  error?: string;
+  multiline?: boolean;
+  numberOfLines?: number;
 }
 
 export function Input({
@@ -25,6 +28,9 @@ export function Input({
   className = '',
   keyboardType = 'default',
   required = false,
+  error,
+  multiline = false,
+  numberOfLines = 1,
 }: InputProps) {
   return (
     <StyledView className={`mb-4 ${className}`}>
@@ -35,14 +41,21 @@ export function Input({
         </StyledText>
       )}
       <StyledTextInput
-        className="bg-gray-800 text-white px-4 py-3 rounded-lg border border-gray-700"
+        className={`bg-gray-800 text-white px-4 py-3 rounded-lg border ${error ? 'border-red-500' : 'border-gray-700'}`}
         placeholder={placeholder}
         placeholderTextColor="#6B7280"
         value={value}
         onChangeText={onChangeText}
         secureTextEntry={secureTextEntry}
         keyboardType={keyboardType}
+        multiline={multiline}
+        numberOfLines={numberOfLines}
+        textAlignVertical={multiline ? 'top' : 'center'}
+        style={multiline ? { minHeight: 24 * numberOfLines } : undefined}
       />
+      {error && (
+        <StyledText className="text-red-500 text-sm mt-1">{error}</StyledText>
+      )}
     </StyledView>
   );
 }
