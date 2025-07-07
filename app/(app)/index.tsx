@@ -1,26 +1,53 @@
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '../components/ui/Button';
-import { getMockData } from '../data/mockData';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ListPicker } from '../components/ListPicker';
+import { listService, entryService } from '../services/supabaseService';
+import { Tables } from '../lib/supabase';
 
 export default function HomeScreen() {
   const [isListPickerVisible, setIsListPickerVisible] = useState(false);
+  const [lists, setLists] = useState<Tables['lists'][]>([]);
+  const [recentEntries, setRecentEntries] = useState<(Tables['entries'] & { lists: { id: string, title: string } })[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [avgRating, setAvgRating] = useState(0);
   
-  const lists = getMockData.getLists();
-  const allEntries = lists.flatMap(list => getMockData.getEntriesByListId(list.id));
-  const recentEntries = lists
-    .flatMap(list => getMockData.getEntriesByListId(list.id)
-      .map(entry => ({ ...entry, listTitle: list.title })))
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 3);
+  // Fetch lists and recent entries from Supabase
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Fetch lists
+        const listsData = await listService.getLists();
+        setLists(listsData);
+        
+        // Fetch recent entries
+        const entriesData = await entryService.getRecentEntries(5);
+        setRecentEntries(entriesData);
+        
+        // Calculate average rating if there are entries
+        if (entriesData.length > 0) {
+          const validRatings = entriesData.filter(entry => entry.rating !== null);
+          const ratingSum = validRatings.reduce((sum, entry) => sum + (entry.rating || 0), 0);
+          const avg = validRatings.length > 0 ? ratingSum / validRatings.length : 0;
+          setAvgRating(avg);
+        }
+      } catch (err: any) {
+        console.error('Error fetching data:', err);
+        setError(err.message || 'Failed to load data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
     
-  const avgRating = allEntries
-    .filter(entry => entry.rating !== null)
-    .reduce((sum, entry) => sum + (entry.rating || 0), 0) / allEntries.length || 0;
+    fetchData();
+  }, []);
     
   const handleSelectList = (listId: string) => {
     setIsListPickerVisible(false);
@@ -54,36 +81,52 @@ export default function HomeScreen() {
 
         <View className="mb-8">
           <Text className="text-xl font-bold text-white mb-4">Recent Entries</Text>
-          <View className="space-y-4">
-            {recentEntries.map(entry => (
-              <Link
-                key={entry.id}
-                href={{ 
-                  pathname: '/(app)/(lists)/[id]/entry/[entryId]',
-                  params: { id: entry.listId, entryId: entry.id }
-                }}
-                asChild
-              >
-                <Pressable className="p-4 rounded-lg bg-gray-800 border border-gray-700">
-                  <View className="flex-row items-center justify-between mb-2">
-                    <Text className="text-lg font-semibold text-white">{entry.title}</Text>
-                    <View className="flex-row items-center">
-                      <MaterialCommunityIcons
-                        name="star"
-                        size={20}
-                        color="#FCD34D"
-                      />
-                      <Text className="text-white ml-1">{entry.rating}</Text>
+          
+          {isLoading ? (
+            <View className="items-center justify-center py-8">
+              <ActivityIndicator size="large" color="#3B82F6" />
+              <Text className="text-gray-400 mt-2">Loading entries...</Text>
+            </View>
+          ) : error ? (
+            <View className="p-4 rounded-lg bg-red-900/20 border border-red-800/30">
+              <Text className="text-red-400">{error}</Text>
+            </View>
+          ) : recentEntries.length === 0 ? (
+            <View className="p-4 rounded-lg bg-gray-800 border border-gray-700 items-center">
+              <Text className="text-gray-400">No entries yet. Create your first entry!</Text>
+            </View>
+          ) : (
+            <View className="space-y-4">
+              {recentEntries.map(entry => (
+                <Link
+                  key={entry.id}
+                  href={{ 
+                    pathname: '/(app)/(lists)/[id]/entry/[entryId]',
+                    params: { id: entry.list_id, entryId: entry.id }
+                  }}
+                  asChild
+                >
+                  <Pressable className="p-4 rounded-lg bg-gray-800 border border-gray-700">
+                    <View className="flex-row items-center justify-between mb-2">
+                      <Text className="text-lg font-semibold text-white">{entry.title}</Text>
+                      <View className="flex-row items-center">
+                        <MaterialCommunityIcons
+                          name="star"
+                          size={20}
+                          color="#FCD34D"
+                        />
+                        <Text className="text-white ml-1">{entry.rating || '-'}</Text>
+                      </View>
                     </View>
-                  </View>
-                  <Text className="text-gray-400">{entry.listTitle}</Text>
-                  <Text className="text-gray-500 text-sm mt-1">
-                    {new Date(entry.createdAt).toLocaleDateString()}
-                  </Text>
-                </Pressable>
-              </Link>
-            ))}
-          </View>
+                    <Text className="text-gray-400">{entry.lists?.title || 'Unknown List'}</Text>
+                    <Text className="text-gray-500 text-sm mt-1">
+                      {new Date(entry.created_at).toLocaleDateString()}
+                    </Text>
+                  </Pressable>
+                </Link>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Quick Stats - Commented out for now

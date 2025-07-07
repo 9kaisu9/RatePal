@@ -180,6 +180,21 @@ export const entryService = {
     return data as Tables['entries'][];
   },
   
+  // Get recent entries across all lists
+  async getRecentEntries(limit: number = 5) {
+    const { data, error } = await supabase
+      .from('entries')
+      .select(`
+        *,
+        lists(id, title)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+      
+    if (error) throw error;
+    return data as (Tables['entries'] & { lists: { id: string, title: string } })[];
+  },
+  
   // Get a specific entry
   async getEntryById(id: string) {
     const { data, error } = await supabase

@@ -17,9 +17,9 @@ export default function WelcomeScreen() {
     );
   }
   
-  // If user is authenticated, redirect to lists
+  // If user is authenticated, redirect to home screen
   if (user) {
-    return <Redirect href="/(app)/(lists)" />;
+    return <Redirect href="/(app)" />;
   }
   
   return (

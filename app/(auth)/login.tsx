@@ -24,9 +24,9 @@ export default function LoginScreen() {
     await signIn(email, password);
     setIsLoading(false);
     
-    // If no error, redirect to main app
+    // If no error, redirect to home screen
     if (!error) {
-      router.replace('/(app)/(lists)');
+      router.replace('/(app)');
     } else {
       Alert.alert('Login Error', error);
     }

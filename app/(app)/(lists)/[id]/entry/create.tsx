@@ -29,7 +29,8 @@ const FIELD_TYPES = {
   NUMBER: 2,
   DATE: 3,
   BOOLEAN: 4,
-  SELECT: 5
+  SELECT: 5,
+  MULTI_SELECT: 6  // New field type for multi-select/tags
 };
 
 interface FormErrors {
@@ -53,6 +54,7 @@ export default function CreateEntryScreen() {
   const [showDatePicker, setShowDatePicker] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Record<string, string>>({});
   const [showSelectOptions, setShowSelectOptions] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<Record<string, string[]>>({});
   
   // Handle date selection
   const handleDateChange = (fieldId: string, date: Date) => {
@@ -220,6 +222,11 @@ export default function CreateEntryScreen() {
           fieldValueData.value_boolean = typeof fieldValue === 'boolean' ? fieldValue : null;
         } else if (field.field_type_id === FIELD_TYPES.SELECT) {
           fieldValueData.value_text = typeof fieldValue === 'string' ? fieldValue : null;
+        } else if (field.field_type_id === FIELD_TYPES.MULTI_SELECT) {
+          // For multi-select, we store the selected tags as a comma-separated string
+          // We could also store it as a JSON array, but using a simple string for compatibility
+          const tags = selectedTags[fieldId] || [];
+          fieldValueData.value_text = tags.length > 0 ? tags.join(',') : null;
         }
         
         console.log('Creating field value:', fieldValueData);
@@ -462,7 +469,7 @@ export default function CreateEntryScreen() {
                         }}
                       >
                         <StyledText className="text-white">
-                          {selectedDate[fieldId] || `Select ${fieldName.toLowerCase()}`}
+                          {formData[fieldId] || selectedDate[fieldId] || `Select ${fieldName.toLowerCase()}`}
                         </StyledText>
                         <MaterialCommunityIcons name="calendar" size={20} color="#fff" />
                       </StyledPressable>
@@ -575,6 +582,130 @@ export default function CreateEntryScreen() {
                     </View>
                   );
                   
+                case FIELD_TYPES.MULTI_SELECT:
+                  const tagOptions = field.options as string[] || [];
+                  const selectedTagsForField = selectedTags[fieldId] || [];
+                  
+                  return (
+                    <View key={fieldId} className="mb-4">
+                      <StyledText className="text-white text-base mb-2">
+                        {fieldName}{isRequired && <StyledText className="text-red-500">*</StyledText>}
+                      </StyledText>
+                      
+                      <StyledPressable 
+                        className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-xl px-4 py-3 flex-row justify-between items-center"
+                        onPress={() => setShowSelectOptions(fieldId)}
+                      >
+                        <View className="flex-1 flex-row flex-wrap">
+                          {selectedTagsForField.length > 0 ? (
+                            selectedTagsForField.map((tag, index) => (
+                              <View 
+                                key={index} 
+                                className="bg-blue-600/30 border border-blue-500/30 rounded-full px-2 py-1 mr-2 mb-1 flex-row items-center"
+                              >
+                                <StyledText className="text-white text-sm">{tag}</StyledText>
+                              </View>
+                            ))
+                          ) : (
+                            <StyledText className="text-gray-400">{`Select ${fieldName.toLowerCase()}`}</StyledText>
+                          )}
+                        </View>
+                        <MaterialCommunityIcons name="chevron-down" size={20} color="#fff" />
+                      </StyledPressable>
+                      
+                      {fieldError && (
+                        <StyledText className="text-red-500 mt-1">{fieldError}</StyledText>
+                      )}
+                      
+                      {showSelectOptions === fieldId && (
+                        <Modal
+                          animationType="slide"
+                          transparent={true}
+                          visible={showSelectOptions === fieldId}
+                          onRequestClose={() => setShowSelectOptions(null)}
+                        >
+                          <View className="flex-1 justify-end bg-black/50">
+                            <View className="bg-gray-800 rounded-t-xl p-4">
+                              <View className="flex-row justify-between items-center mb-4">
+                                <StyledText className="text-white text-lg font-bold">
+                                  Select {fieldName}
+                                </StyledText>
+                                <StyledPressable onPress={() => setShowSelectOptions(null)}>
+                                  <MaterialCommunityIcons name="close" size={24} color="#fff" />
+                                </StyledPressable>
+                              </View>
+                              
+                              {selectedTagsForField.length > 0 && (
+                                <View className="flex-row flex-wrap mb-4">
+                                  {selectedTagsForField.map((tag, index) => (
+                                    <View 
+                                      key={index} 
+                                      className="bg-blue-600 rounded-full px-3 py-1 mr-2 mb-2 flex-row items-center"
+                                    >
+                                      <StyledText className="text-white text-sm mr-1">{tag}</StyledText>
+                                      <StyledPressable 
+                                        onPress={() => {
+                                          const updatedTags = selectedTagsForField.filter(t => t !== tag);
+                                          setSelectedTags(prev => ({ ...prev, [fieldId]: updatedTags }));
+                                          setFormData(prev => ({ ...prev, [fieldId]: updatedTags.join(',') }));
+                                        }}
+                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                      >
+                                        <MaterialCommunityIcons name="close" size={16} color="#fff" />
+                                      </StyledPressable>
+                                    </View>
+                                  ))}
+                                </View>
+                              )}
+                              
+                              <View className="bg-gray-700 rounded-xl mb-4 max-h-80 overflow-hidden">
+                                <ScrollView>
+                                  {tagOptions.map((option) => {
+                                    const isSelected = selectedTagsForField.includes(option);
+                                    return (
+                                      <StyledPressable 
+                                        key={option}
+                                        className={`px-4 py-4 border-b border-gray-600/30 ${isSelected ? 'bg-blue-600/30' : ''}`}
+                                        onPress={() => {
+                                          let updatedTags;
+                                          if (isSelected) {
+                                            // Remove tag if already selected
+                                            updatedTags = selectedTagsForField.filter(tag => tag !== option);
+                                          } else {
+                                            // Add tag if not selected
+                                            updatedTags = [...selectedTagsForField, option];
+                                          }
+                                          setSelectedTags(prev => ({ ...prev, [fieldId]: updatedTags }));
+                                          setFormData(prev => ({ ...prev, [fieldId]: updatedTags.join(',') }));
+                                          if (fieldError) setErrors(prev => ({ ...prev, [fieldId]: '' }));
+                                        }}
+                                      >
+                                        <View className="flex-row justify-between items-center">
+                                          <StyledText className="text-white text-base">{option}</StyledText>
+                                          {isSelected && (
+                                            <MaterialCommunityIcons name="check" size={20} color="#fff" />
+                                          )}
+                                        </View>
+                                      </StyledPressable>
+                                    );
+                                  })}
+                                </ScrollView>
+                              </View>
+                              
+                              <Button
+                                variant="primary"
+                                onPress={() => setShowSelectOptions(null)}
+                                className="rounded-xl bg-blue-600 py-3"
+                              >
+                                Done
+                              </Button>
+                            </View>
+                          </View>
+                        </Modal>
+                      )}
+                    </View>
+                  );
+                  
                 default:
                   return null;
               }
@@ -600,6 +731,9 @@ export default function CreateEntryScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      
+      {/* Render date picker modal */}
+      {renderDatePickerModal()}
     </SafeAreaView>
   );
 }

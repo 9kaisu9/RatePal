@@ -87,7 +87,7 @@ export default function ListDetailScreen() {
               variant="outline"
               className="rounded-xl border-gray-600/50 hover:bg-gray-700/50 hover:border-gray-500/50 transition-all px-4 py-2"
               onPress={() => router.push({ 
-                pathname: '/(app)/(lists)/[id]',
+                pathname: '/(app)/(lists)/[id]/settings',
                 params: { id: id.toString() }
               })}
             >

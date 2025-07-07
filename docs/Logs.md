@@ -1,5 +1,26 @@
 # RatePal Development Log
 
+## 2025-07-07
+
+### Edit Entry Screen Implementation
+- Implemented fully functional edit entry screen
+  - Created screen at `/(app)/(lists)/[id]/entry/[entryId]/edit.tsx`
+  - Fetches existing entry data and field values from Supabase
+  - Pre-populates form with existing values
+  - Supports all custom field types:
+    - Text fields with validation
+    - Number fields with numeric keyboard
+    - Date fields with date picker modal
+    - Boolean fields with toggle switches
+    - Select fields with option selection
+    - Multi-select fields with tags display
+  - Validates required fields and rating constraints
+  - Updates entry and field values in Supabase
+  - Provides loading and error states for better UX
+- Fixed navigation from entry detail screen to edit screen
+- Maintained consistent UI/UX with the app's design system
+
+
 ## 2025-06-30
 
 ### UI Layout Improvements

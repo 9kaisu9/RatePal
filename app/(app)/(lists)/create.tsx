@@ -22,7 +22,7 @@ const StyledScrollView = styled(ScrollView);
 const StyledSafeAreaView = styled(SafeAreaView);
 
 // Field type options with properly typed icons
-type IconName = 'text' | 'numeric' | 'calendar' | 'checkbox-marked-outline' | 'format-list-bulleted' | 'close' | 'checkbox-marked' | 'checkbox-blank-outline' | 'format-list-text';
+type IconName = 'text' | 'numeric' | 'calendar' | 'checkbox-marked-outline' | 'format-list-bulleted' | 'format-list-checks' | 'close' | 'checkbox-marked' | 'checkbox-blank-outline' | 'format-list-text';
 
 const fieldTypes = [
   { id: 1, name: 'text', label: 'Text', icon: 'text' as IconName },
@@ -30,6 +30,7 @@ const fieldTypes = [
   { id: 3, name: 'date', label: 'Date', icon: 'calendar' as IconName },
   { id: 4, name: 'boolean', label: 'Yes/No', icon: 'checkbox-marked-outline' as IconName },
   { id: 5, name: 'select', label: 'Select', icon: 'format-list-bulleted' as IconName },
+  { id: 6, name: 'multi-select', label: 'Multi-Select', icon: 'format-list-checks' as IconName },
 ];
 
 // Interface for custom field
@@ -77,8 +78,8 @@ export default function CreateListScreen() {
       return;
     }
 
-    // For select type, validate that there are options
-    if (newFieldType === 5 && selectOptions.length === 0) {
+    // For select or multi-select type, validate that there are options
+    if ((newFieldType === 5 || newFieldType === 6) && selectOptions.length === 0) {
       Alert.alert('Error', 'Select fields must have at least one option');
       return;
     }
@@ -88,8 +89,8 @@ export default function CreateListScreen() {
       field_type_id: newFieldType,
       is_required: newFieldRequired,
       position: customFields.length + 1,
-      // Only add options for select fields
-      options: newFieldType === 5 ? selectOptions : undefined
+      // Add options for select and multi-select fields
+      options: (newFieldType === 5 || newFieldType === 6) ? selectOptions : undefined
     };
 
     setCustomFields([...customFields, newField]);
@@ -327,10 +328,10 @@ Details: ${err.details || 'None'}`
               <StyledText className="text-gray-300 ml-2">Required Field</StyledText>
             </StyledPressable>
 
-            {/* Select Options UI - Only show when Select field type is chosen */}
-            {newFieldType === 5 && (
+            {/* Select/Multi-Select Options UI - Only show when Select or Multi-Select field type is chosen */}
+            {(newFieldType === 5 || newFieldType === 6) && (
               <StyledView className="mb-4 p-3 rounded-lg border border-gray-700 bg-gray-800/50">
-                <StyledText className="text-white font-medium mb-2">Select Options</StyledText>
+                <StyledText className="text-white font-medium mb-2">{newFieldType === 6 ? 'Multi-Select Options' : 'Select Options'}</StyledText>
                 
                 {/* Display existing options */}
                 {selectOptions.length > 0 && (
