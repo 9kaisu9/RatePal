@@ -35,6 +35,41 @@ const FIELD_TYPE_NAMES = {
   6: 'Multi-Select'
 };
 
+// Utility function to safely parse field options
+const parseFieldOptions = (options: any): string[] => {
+  if (!options) return [];
+  
+  try {
+    // If options is a string, try to parse it as JSON
+    if (typeof options === 'string') {
+      try {
+        const parsedOptions = JSON.parse(options);
+        if (Array.isArray(parsedOptions)) {
+          return parsedOptions;
+        } else if (typeof parsedOptions === 'object' && parsedOptions !== null && Array.isArray(parsedOptions.options)) {
+          // Handle legacy format where options might be stored as { options: [...] }
+          return parsedOptions.options;
+        } else {
+          // Fallback to comma-separated string
+          return options.split(',').map((opt: string) => opt.trim());
+        }
+      } catch (e) {
+        console.log('JSON parse error for options:', e);
+        // If JSON parsing fails, treat as comma-separated string
+        return options.split(',').map((opt: string) => opt.trim());
+      }
+    } 
+    // If options is already an array, use it directly
+    else if (Array.isArray(options)) {
+      return options;
+    }
+  } catch (e) {
+    console.error('Error parsing options:', e);
+  }
+  
+  return [];
+};
+
 export default function ListSettingsScreen() {
   const { id } = useLocalSearchParams();
   const [list, setList] = useState<Tables['lists'] | null>(null);
@@ -54,6 +89,23 @@ export default function ListSettingsScreen() {
   const [fieldOptions, setFieldOptions] = useState<string>('');
   const [fieldRequired, setFieldRequired] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
+  
+  // Debug function to log field options
+  const logFieldOptions = (field: Tables['custom_fields']) => {
+    console.log(`Field ${field.name} options type:`, typeof field.options);
+    console.log(`Field ${field.name} options value:`, field.options);
+    
+    if (field.options) {
+      if (typeof field.options === 'string') {
+        try {
+          const parsed = JSON.parse(field.options);
+          console.log(`Field ${field.name} parsed options:`, parsed);
+        } catch (e) {
+          console.log(`Field ${field.name} is not valid JSON:`, e);
+        }
+      }
+    }
+  };
   
   // Fetch list data
   useEffect(() => {
@@ -75,6 +127,17 @@ export default function ListSettingsScreen() {
         
         // Fetch custom fields for this list
         const fieldsData = await customFieldService.getCustomFieldsByListId(id);
+        
+        // Log field options for debugging
+        if (fieldsData && fieldsData.length > 0) {
+          console.log('All custom fields:', fieldsData);
+          fieldsData.forEach(field => {
+            if (field.field_type_id === FIELD_TYPES.SELECT || field.field_type_id === FIELD_TYPES.MULTI_SELECT) {
+              logFieldOptions(field);
+            }
+          });
+        }
+        
         setCustomFields(fieldsData || []);
         
       } catch (err: any) {
@@ -130,7 +193,12 @@ export default function ListSettingsScreen() {
       
       await listService.deleteList(id);
       setShowDeleteConfirm(false);
-      router.replace('/lists');
+      
+      // Navigate back to lists screen with a refresh parameter to trigger data reload
+      router.replace({
+        pathname: '/(app)/(lists)',
+        params: { refresh: Date.now().toString() }
+      });
       
     } catch (err: any) {
       console.error('Error deleting list:', err);
@@ -145,7 +213,12 @@ export default function ListSettingsScreen() {
     setFieldName(field.name);
     setFieldType(field.field_type_id);
     setFieldRequired(field.is_required || false);
-    setFieldOptions(field.options ? field.options.join(',') : '');
+    
+    // Parse options using the utility function
+    const optionsArray = parseFieldOptions(field.options);
+    
+    // Join options into a comma-separated string for the input field
+    setFieldOptions(optionsArray.join(','));
     setShowFieldModal(true);
   };
 
@@ -166,9 +239,14 @@ export default function ListSettingsScreen() {
     try {
       setSaving(true);
       
-      const options = (fieldType === FIELD_TYPES.SELECT || fieldType === FIELD_TYPES.MULTI_SELECT) 
-        ? fieldOptions.split(',').map(opt => opt.trim()).filter(opt => opt) 
-        : null;
+      // Parse options for select and multi-select fields
+      let options = null;
+      if (fieldType === FIELD_TYPES.SELECT || fieldType === FIELD_TYPES.MULTI_SELECT) {
+        // Convert comma-separated string to array and filter out empty options
+        const optionsArray = fieldOptions.split(',').map(opt => opt.trim()).filter(opt => opt);
+        // Store as JSON string for consistency with the rest of the app
+        options = JSON.stringify(optionsArray);
+      }
       
       if (currentField) {
         // Update existing field
@@ -353,7 +431,7 @@ export default function ListSettingsScreen() {
                       </StyledText>
                       {(field.field_type_id === FIELD_TYPES.SELECT || field.field_type_id === FIELD_TYPES.MULTI_SELECT) && field.options && (
                         <StyledText className="text-gray-400 text-sm mt-1" numberOfLines={1}>
-                          Options: {field.options.join(', ')}
+                          Options: {parseFieldOptions(field.options).join(', ')}
                         </StyledText>
                       )}
                     </View>

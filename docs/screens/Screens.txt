@@ -131,11 +131,18 @@
 ### 3. Edit Entry Screen
 - Same layout as Create Entry Screen but with pre-filled data
 - Entry title field
-- Rating slider (0-100)
+- Rating slider (0-5 stars)
 - Description field
-- Custom fields based on list definition
-- Photo management (view/delete/add)
-- "Update" button
+- Custom fields based on list definition with support for:
+  - Text fields with validation
+  - Number fields with numeric keyboard
+  - Date fields with date picker modal
+  - Boolean fields with toggle switches
+  - Select fields with option selection modal
+  - Multi-select fields with tags display
+- Validation for required fields
+- Loading and error states
+- "Save" button
 - "Cancel" button
 
 ### 4. Entry Details Screen

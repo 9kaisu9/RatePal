@@ -1,56 +1,80 @@
 import { View, Text, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useRefresh } from '../../../../../lib/RefreshContext';
 import { Button } from '../../../../components/ui/Button';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
-import { entryService, fieldValueService, customFieldService } from '../../../../services/supabaseService';
+import { entryService, fieldValueService, customFieldService, listService } from '../../../../services/supabaseService';
 import { Tables } from '../../../../lib/supabase';
 
 export default function EntryDetailScreen() {
   const { id, entryId } = useLocalSearchParams();
+  const { refreshTimestamp } = useRefresh();
   const [entry, setEntry] = useState<Tables['entries'] | null>(null);
   const [fieldValues, setFieldValues] = useState<Tables['field_values'][]>([]);
   const [customFields, setCustomFields] = useState<Tables['custom_fields'][]>([]);
+  const [listTitle, setListTitle] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch entry data and field values
-  useEffect(() => {
-    const fetchEntryData = async () => {
-      if (!entryId || typeof entryId !== 'string') {
-        setError('Invalid entry ID');
-        setIsLoading(false);
-        return;
-      }
+  const fetchEntryData = async () => {
+    if (!entryId || typeof entryId !== 'string') {
+      setError('Invalid entry ID');
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        setIsLoading(true);
-        setError(null);
+    try {
+      setIsLoading(true);
+      setError(null);
 
-        // Fetch entry details
-        const entryData = await entryService.getEntryById(entryId);
-        setEntry(entryData);
+      // Fetch entry details
+      const entryData = await entryService.getEntryById(entryId);
+      setEntry(entryData);
 
-        // Fetch field values for this entry
-        const fieldValueData = await fieldValueService.getFieldValuesByEntryId(entryId);
-        setFieldValues(fieldValueData);
+      // Fetch field values for this entry
+      const fieldValueData = await fieldValueService.getFieldValuesByEntryId(entryId);
+      setFieldValues(fieldValueData);
 
-        // Fetch custom fields for the list to get field names and types
-        if (id && typeof id === 'string') {
-          const customFieldsData = await customFieldService.getCustomFieldsByListId(id);
-          setCustomFields(customFieldsData);
+      // Fetch custom fields for the list to get field names and types
+      if (id && typeof id === 'string') {
+        const customFieldsData = await customFieldService.getCustomFieldsByListId(id);
+        setCustomFields(customFieldsData);
+        
+        // Fetch list details to get the list title for the back button
+        const listData = await listService.getListById(id);
+        if (listData) {
+          setListTitle(listData.title);
         }
-      } catch (err: any) {
-        console.error('Error fetching entry data:', err);
-        setError(err.message || 'Failed to load entry data');
-      } finally {
-        setIsLoading(false);
       }
-    };
+    } catch (err: any) {
+      console.error('Error fetching entry data:', err);
+      setError(err.message || 'Failed to load entry data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  // Fetch data initially and when refreshTimestamp changes
+  useEffect(() => {
     fetchEntryData();
-  }, [entryId, id]);
+    // Log refresh timestamp for debugging
+    if (refreshTimestamp > 0) {
+      console.log('Entry details refreshing due to context update:', refreshTimestamp);
+    }
+  }, [entryId, id, refreshTimestamp]);
+  
+  // Only set the back button text, keep header title empty
+  useEffect(() => {
+    if (entry) {
+      // Only set the list title for back button, keep header title empty
+      router.setParams({ 
+        listTitle: listTitle || 'Back'
+      });
+    }
+  }, [entry, listTitle]);
 
   const handleDelete = async () => {
     if (!entryId || typeof entryId !== 'string') return;
@@ -133,7 +157,7 @@ export default function EntryDetailScreen() {
 
   if (error || !entry) {
     return (
-      <SafeAreaView className="flex-1 bg-gray-900 p-6">
+      <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-900 p-6">
         <View className="flex-row items-center justify-between mb-8">
           <Text className="text-2xl font-bold text-white">Error</Text>
           <Button variant="outline" onPress={() => router.back()}>
@@ -148,8 +172,8 @@ export default function EntryDetailScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-900">
-      <ScrollView className="flex-1 p-6">
+    <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-900">
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 }}>
         <View className="flex-row items-center justify-between mb-8">
           <Text className="text-2xl font-bold text-white">{entry.title}</Text>
           <Button variant="outline" onPress={() => router.back()}>

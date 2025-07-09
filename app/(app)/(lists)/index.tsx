@@ -1,6 +1,6 @@
-import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Link, router } from 'expo-router';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import { Button } from '../../components/ui/Button';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
@@ -17,18 +17,30 @@ const StyledScrollView = styled(ScrollView);
 const StyledSafeAreaView = styled(SafeAreaView);
 
 export default function ListsScreen() {
+  const { refresh } = useLocalSearchParams();
   const [lists, setLists] = useState<Tables['lists'][]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isListPickerVisible, setIsListPickerVisible] = useState(false);
   
+  // Initial data fetch
   useEffect(() => {
     fetchLists();
   }, []);
   
-  const fetchLists = async () => {
+  // Fetch data when refresh parameter changes (after list deletion)
+  useEffect(() => {
+    if (refresh) {
+      fetchLists(true);
+    }
+  }, [refresh]);
+  
+  const fetchLists = async (isRefreshing = false) => {
     try {
-      setLoading(true);
+      if (!isRefreshing) {
+        setLoading(true);
+      }
       setError(null);
       const listsData = await listService.getLists();
       setLists(listsData);
@@ -37,7 +49,14 @@ export default function ListsScreen() {
       setError('Failed to load lists');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+  
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchLists(true);
   };
   
   const handleQuickCreateEntry = () => {
@@ -140,6 +159,17 @@ export default function ListsScreen() {
           padding: 24,
           paddingBottom: 100
         }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#60A5FA"
+            colors={["#60A5FA"]} // Android
+            progressBackgroundColor="#1F2937" // Android
+            title="Pull to refresh" // iOS
+            titleColor="#60A5FA" // iOS
+          />
+        }
       >
         <StyledView className="flex-row items-center justify-between mb-8">
           <StyledText className="text-3xl font-bold text-white tracking-tight">My Lists</StyledText>

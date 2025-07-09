@@ -20,6 +20,33 @@
 - Fixed navigation from entry detail screen to edit screen
 - Maintained consistent UI/UX with the app's design system
 
+### List Settings Screen Implementation
+- Created list settings screen at `/(app)/(lists)/[id]/settings.tsx`
+- Implemented list editing functionality
+  - Update list name and description
+  - Add, edit, and remove custom fields
+  - Configure field properties (required, options)
+  - Reorder fields with drag-and-drop
+- Added list deletion with confirmation
+- Fixed navigation between list detail and settings screens
+- Implemented proper error handling and loading states
+
+### Custom Field Management
+- Added support for all field types in list settings
+  - Text, Number, Date, Boolean, Select, Multi-select
+- Implemented field option management for select fields
+  - Add, edit, and remove options
+  - Comma-separated option storage
+- Added field validation for required fields
+- Implemented field reordering with position tracking
+
+### Bug Fixes and Improvements
+- Fixed import paths for UI components and services
+- Corrected custom field creation by using 'position' instead of 'sort_order'
+- Fixed type issues related to field values and update calls
+- Improved form data handling for different field types
+- Enhanced error handling and user feedback
+
 
 ## 2025-06-30
 

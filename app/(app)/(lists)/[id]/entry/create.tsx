@@ -5,11 +5,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Button } from '../../../../components/ui/Button';
 import { Input } from '../../../../components/ui/Input';
 import { useState, useEffect } from 'react';
-import { listService, customFieldService, entryService, fieldValueService } from '../../../../services/supabaseService';
+import { listService, customFieldService, entryService, fieldValueService, listRatingSettingsService, ratingSystemService } from '../../../../services/supabaseService';
 import { Tables } from '../../../../lib/supabase';
 import { useAuth } from '../../../../context/AuthContext';
 import { styled } from 'nativewind';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Slider from '@react-native-community/slider';
 
 // Default guest user ID
 const GUEST_USER_ID = '00000000-0000-0000-0000-000000000000';
@@ -56,6 +57,10 @@ export default function CreateEntryScreen() {
   const [showSelectOptions, setShowSelectOptions] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<Record<string, string[]>>({});
   
+  // Rating system states
+  const [ratingSystem, setRatingSystem] = useState<Tables['rating_systems'] | null>(null);
+  const [listRatingSettings, setListRatingSettings] = useState<Tables['list_rating_settings'] | null>(null);
+  
   // Handle date selection
   const handleDateChange = (fieldId: string, date: Date) => {
     const formattedDate = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
@@ -96,6 +101,27 @@ export default function CreateEntryScreen() {
         const fieldsData = await customFieldService.getCustomFieldsByListId(id);
         setCustomFields(fieldsData);
         
+        // Fetch list rating settings
+        const ratingSettingsData = await listRatingSettingsService.getListRatingSettings(id);
+        setListRatingSettings(ratingSettingsData);
+        
+        // Fetch rating system
+        if (ratingSettingsData) {
+          const ratingSystemData = await ratingSystemService.getRatingSystemById(ratingSettingsData.rating_system_id);
+          setRatingSystem(ratingSystemData);
+          
+          // Initialize rating with middle value
+          const minValue = ratingSystemData.min_value;
+          const maxValue = ratingSystemData.max_value;
+          const middleValue = (minValue + maxValue) / 2;
+          const roundedMiddleValue = Math.round(middleValue / ratingSystemData.step_value) * ratingSystemData.step_value;
+          
+          setFormData(prev => ({
+            ...prev,
+            rating: roundedMiddleValue.toString()
+          }));
+        }
+        
         setLoading(false);
       } catch (err: any) {
         console.error('Error fetching data:', err);
@@ -106,6 +132,127 @@ export default function CreateEntryScreen() {
     
     fetchData();
   }, [id]);
+
+  // Render rating input based on rating system type
+  const renderRatingInput = () => {
+    if (!ratingSystem) {
+      return (
+        <Input
+          label="Rating (1-5)"
+          placeholder="Enter rating"
+          value={formData.rating}
+          onChangeText={(text) => {
+            setFormData(prev => ({ ...prev, rating: text }));
+            if (errors.rating) setErrors(prev => ({ ...prev, rating: '' }));
+          }}
+          keyboardType="numeric"
+          error={errors.rating}
+          className="bg-gray-800/50 backdrop-blur-sm border-gray-700/50 rounded-xl px-4 py-3"
+        />
+      );
+    }
+    
+    const { min_value, max_value, step_value, display_type } = ratingSystem;
+    const currentValue = parseFloat(formData.rating) || min_value;
+    
+    switch (display_type) {
+      case 'stars':
+        // Star rating display
+        return (
+          <View className="mb-4">
+            <Text className="text-white text-base font-medium mb-2">Rating</Text>
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row">
+                {Array.from({ length: 5 }).map((_, index) => {
+                  const starValue = min_value + (index * ((max_value - min_value) / 4));
+                  const isFilled = currentValue >= starValue;
+                  return (
+                    <Pressable 
+                      key={index}
+                      onPress={() => {
+                        const newValue = starValue;
+                        setFormData(prev => ({ ...prev, rating: newValue.toString() }));
+                        if (errors.rating) setErrors(prev => ({ ...prev, rating: '' }));
+                      }}
+                      className="p-1"
+                    >
+                      <MaterialCommunityIcons 
+                        name={isFilled ? "star" : "star-outline"} 
+                        size={32} 
+                        color={isFilled ? "#F59E0B" : "#6B7280"} 
+                      />
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text className="text-white text-lg">{currentValue}</Text>
+            </View>
+            {errors.rating && <Text className="text-red-500 text-sm mt-1">{errors.rating}</Text>}
+          </View>
+        );
+        
+      case 'emoji':
+        // Emoji rating display
+        const emojis = ['😢', '😕', '😐', '🙂', '😄'];
+        return (
+          <View className="mb-4">
+            <Text className="text-white text-base font-medium mb-2">Rating</Text>
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row">
+                {emojis.map((emoji, index) => {
+                  const emojiValue = min_value + (index * ((max_value - min_value) / 4));
+                  const isSelected = Math.abs(currentValue - emojiValue) < step_value;
+                  return (
+                    <Pressable 
+                      key={index}
+                      onPress={() => {
+                        setFormData(prev => ({ ...prev, rating: emojiValue.toString() }));
+                        if (errors.rating) setErrors(prev => ({ ...prev, rating: '' }));
+                      }}
+                      className={`p-2 rounded-full ${isSelected ? 'bg-blue-500/30' : ''}`}
+                    >
+                      <Text className="text-3xl">{emoji}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text className="text-white text-lg">{currentValue}</Text>
+            </View>
+            {errors.rating && <Text className="text-red-500 text-sm mt-1">{errors.rating}</Text>}
+          </View>
+        );
+        
+      case 'slider':
+      case 'percentage':
+      default:
+        // Slider or numeric input
+        return (
+          <View className="mb-4">
+            <Text className="text-white text-base font-medium mb-2">Rating ({min_value} to {max_value})</Text>
+            <Slider
+              minimumValue={min_value}
+              maximumValue={max_value}
+              step={step_value}
+              value={currentValue}
+              onValueChange={(value) => {
+                setFormData(prev => ({ ...prev, rating: value.toString() }));
+                if (errors.rating) setErrors(prev => ({ ...prev, rating: '' }));
+              }}
+              minimumTrackTintColor="#3B82F6"
+              maximumTrackTintColor="#4B5563"
+              thumbTintColor="#60A5FA"
+              className="mb-2"
+            />
+            <View className="flex-row justify-between">
+              <Text className="text-gray-400">{min_value}</Text>
+              <Text className="text-white font-medium">{currentValue}</Text>
+              <Text className="text-gray-400">{max_value}</Text>
+            </View>
+            {errors.rating && <Text className="text-red-500 text-sm mt-1">{errors.rating}</Text>}
+          </View>
+        );
+    }
+  };
 
   const validateForm = () => {
     const newErrors: FormErrors = {};
@@ -118,9 +265,14 @@ export default function CreateEntryScreen() {
     // Validate rating
     if (!formData.rating) {
       newErrors.rating = 'Rating is required';
+    } else if (ratingSystem) {
+      const ratingValue = parseFloat(formData.rating);
+      if (isNaN(ratingValue) || ratingValue < ratingSystem.min_value || ratingValue > ratingSystem.max_value) {
+        newErrors.rating = `Rating must be between ${ratingSystem.min_value} and ${ratingSystem.max_value}`;
+      }
     } else {
-      const rating = Number(formData.rating);
-      if (isNaN(rating) || rating < 1 || rating > 5) {
+      const ratingValue = parseFloat(formData.rating);
+      if (isNaN(ratingValue) || ratingValue < 1 || ratingValue > 5) {
         newErrors.rating = 'Rating must be between 1 and 5';
       }
     }
@@ -396,18 +548,7 @@ export default function CreateEntryScreen() {
               className="bg-gray-800/50 backdrop-blur-sm border-gray-700/50 rounded-xl px-4 py-3"
             />
 
-            <Input
-              label="Rating (1-5)"
-              placeholder="Enter rating"
-              value={formData.rating}
-              onChangeText={(text) => {
-                setFormData(prev => ({ ...prev, rating: text }));
-                if (errors.rating) setErrors(prev => ({ ...prev, rating: '' }));
-              }}
-              keyboardType="numeric"
-              error={errors.rating}
-              className="bg-gray-800/50 backdrop-blur-sm border-gray-700/50 rounded-xl px-4 py-3"
-            />
+            {renderRatingInput()}
 
             {/* Custom Fields */}
             {customFields.map((field) => {
@@ -506,7 +647,42 @@ export default function CreateEntryScreen() {
                   );
                   
                 case FIELD_TYPES.SELECT:
-                  const options = field.options as string[] || [];
+                  // Parse options for select fields
+                  let options: string[] = [];
+                  if (field.options) {
+                    try {
+                      // If options is a string, try to parse it as JSON
+                      if (typeof field.options === 'string') {
+                        try {
+                          const parsedOptions = JSON.parse(field.options);
+                          if (Array.isArray(parsedOptions)) {
+                            options = parsedOptions;
+                          } else if (typeof parsedOptions === 'object' && parsedOptions !== null && Array.isArray(parsedOptions.options)) {
+                            // Handle legacy format where options might be stored as { options: [...] }
+                            options = parsedOptions.options;
+                          } else {
+                            // Fallback to comma-separated string
+                            options = field.options.split(',').map(opt => opt.trim());
+                          }
+                        } catch (e) {
+                          console.log('JSON parse error for select field:', e);
+                          // If JSON parsing fails, treat as comma-separated string
+                          options = field.options.split(',').map(opt => opt.trim());
+                        }
+                      } 
+                      // If options is already an array, use it directly
+                      else if (Array.isArray(field.options)) {
+                        options = field.options;
+                      }
+                    } catch (e) {
+                      console.error('Error parsing select options:', e);
+                    }
+                  }
+                  
+                  // Debug output
+                  console.log('Field options type for select:', typeof field.options);
+                  console.log('Field options value for select:', field.options);
+                  console.log('Parsed select options:', options);
                   return (
                     <View key={fieldId} className="mb-4">
                       <StyledText className="text-white text-base mb-2">
@@ -583,7 +759,42 @@ export default function CreateEntryScreen() {
                   );
                   
                 case FIELD_TYPES.MULTI_SELECT:
-                  const tagOptions = field.options as string[] || [];
+                  // Ensure tagOptions is always an array
+                  let tagOptions: string[] = [];
+                  if (field.options) {
+                    try {
+                      // If options is a string, try to parse it as JSON
+                      if (typeof field.options === 'string') {
+                        try {
+                          const parsedOptions = JSON.parse(field.options);
+                          if (Array.isArray(parsedOptions)) {
+                            tagOptions = parsedOptions;
+                          } else if (typeof parsedOptions === 'object' && parsedOptions !== null && Array.isArray(parsedOptions.options)) {
+                            // Handle legacy format where options might be stored as { options: [...] }
+                            tagOptions = parsedOptions.options;
+                          } else {
+                            // Fallback to comma-separated string
+                            tagOptions = field.options.split(',').map(opt => opt.trim());
+                          }
+                        } catch (e) {
+                          console.log('JSON parse error:', e);
+                          // If JSON parsing fails, treat as comma-separated string
+                          tagOptions = field.options.split(',').map(opt => opt.trim());
+                        }
+                      } 
+                      // If options is already an array, use it directly
+                      else if (Array.isArray(field.options)) {
+                        tagOptions = field.options;
+                      }
+                    } catch (e) {
+                      console.error('Error parsing multi-select options:', e);
+                    }
+                  }
+                  
+                  // Debug output
+                  console.log('Field options type:', typeof field.options);
+                  console.log('Field options value:', field.options);
+                  console.log('Parsed tag options:', tagOptions);
                   const selectedTagsForField = selectedTags[fieldId] || [];
                   
                   return (
@@ -660,7 +871,9 @@ export default function CreateEntryScreen() {
                               
                               <View className="bg-gray-700 rounded-xl mb-4 max-h-80 overflow-hidden">
                                 <ScrollView>
-                                  {tagOptions.map((option) => {
+                                  {/* Debug log for tag options */}
+                                  {(() => { console.log('Rendering tag options:', tagOptions); return null; })()}
+                                  {tagOptions && tagOptions.length > 0 ? tagOptions.map((option) => {
                                     const isSelected = selectedTagsForField.includes(option);
                                     return (
                                       <StyledPressable 
@@ -688,7 +901,11 @@ export default function CreateEntryScreen() {
                                         </View>
                                       </StyledPressable>
                                     );
-                                  })}
+                                  }) : (
+                                    <View className="p-4">
+                                      <StyledText className="text-gray-400 text-center">No options available</StyledText>
+                                    </View>
+                                  )}
                                 </ScrollView>
                               </View>
                               

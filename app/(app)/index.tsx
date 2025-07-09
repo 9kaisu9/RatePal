@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -13,39 +13,50 @@ export default function HomeScreen() {
   const [lists, setLists] = useState<Tables['lists'][]>([]);
   const [recentEntries, setRecentEntries] = useState<(Tables['entries'] & { lists: { id: string, title: string } })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avgRating, setAvgRating] = useState(0);
   
   // Fetch lists and recent entries from Supabase
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
+  const fetchData = async (isRefreshing = false) => {
+    try {
+      if (!isRefreshing) {
         setIsLoading(true);
-        setError(null);
-        
-        // Fetch lists
-        const listsData = await listService.getLists();
-        setLists(listsData);
-        
-        // Fetch recent entries
-        const entriesData = await entryService.getRecentEntries(5);
-        setRecentEntries(entriesData);
-        
-        // Calculate average rating if there are entries
-        if (entriesData.length > 0) {
-          const validRatings = entriesData.filter(entry => entry.rating !== null);
-          const ratingSum = validRatings.reduce((sum, entry) => sum + (entry.rating || 0), 0);
-          const avg = validRatings.length > 0 ? ratingSum / validRatings.length : 0;
-          setAvgRating(avg);
-        }
-      } catch (err: any) {
-        console.error('Error fetching data:', err);
-        setError(err.message || 'Failed to load data');
-      } finally {
-        setIsLoading(false);
       }
-    };
-    
+      setError(null);
+      
+      // Fetch lists
+      const listsData = await listService.getLists();
+      setLists(listsData);
+      
+      // Fetch recent entries
+      const entriesData = await entryService.getRecentEntries(5);
+      setRecentEntries(entriesData);
+      
+      // Calculate average rating if there are entries
+      if (entriesData.length > 0) {
+        const validRatings = entriesData.filter(entry => entry.rating !== null);
+        const ratingSum = validRatings.reduce((sum, entry) => sum + (entry.rating || 0), 0);
+        const avg = validRatings.length > 0 ? ratingSum / validRatings.length : 0;
+        setAvgRating(avg);
+      }
+    } catch (err: any) {
+      console.error('Error fetching data:', err);
+      setError(err.message || 'Failed to load data');
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  };
+  
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData(true);
+  };
+  
+  // Initial data fetch
+  useEffect(() => {
     fetchData();
   }, []);
     
@@ -73,6 +84,17 @@ export default function HomeScreen() {
           padding: 24,
           paddingBottom: 100
         }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#3B82F6"
+            colors={["#3B82F6"]} // Android
+            progressBackgroundColor="#1F2937" // Android
+            title="Pull to refresh" // iOS
+            titleColor="#3B82F6" // iOS
+          />
+        }
       >
         <View className="mb-8">
           <Text className="text-3xl font-bold text-white mb-2">Welcome back!</Text>

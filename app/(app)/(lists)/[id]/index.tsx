@@ -1,5 +1,6 @@
-import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
-import { Link, useLocalSearchParams, router } from 'expo-router';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
+import { router, useLocalSearchParams, Link } from 'expo-router';
+import { useRefresh } from '../../../../lib/RefreshContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Button } from '../../../components/ui/Button';
@@ -11,49 +12,75 @@ import { Tables } from '../../../lib/supabase';
 
 export default function ListDetailScreen() {
   const { id } = useLocalSearchParams();
+  const { refreshTimestamp } = useRefresh();
   const [list, setList] = useState<Tables['lists'] | null>(null);
   const [entries, setEntries] = useState<Tables['entries'][]>([]);
   const [customFields, setCustomFields] = useState<Tables['custom_fields'][]>([]);
   const [fieldValues, setFieldValues] = useState<Tables['field_values'][]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // Fetch list data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
+  const fetchData = async (isRefreshing = false) => {
+    try {
+      if (!isRefreshing) {
         setLoading(true);
-        setError(null);
-        
-        // Fetch list
-        const listData = await listService.getListById(id as string);
-        if (!listData) throw new Error('List not found');
-        setList(listData);
-        
-        // Fetch entries
-        const entriesData = await entryService.getEntriesByListId(id as string);
-        setEntries(entriesData || []);
-        
-        // Fetch custom fields
-        const fieldsData = await customFieldService.getCustomFieldsByListId(id as string);
-        setCustomFields(fieldsData || []);
-        
-        // Fetch field values for all entries
-        if (entriesData && entriesData.length > 0) {
-          const entryIds = entriesData.map((entry: Tables['entries']) => entry.id);
-          const valuesData = await fieldValueService.getFieldValuesByEntryIds(entryIds);
-          setFieldValues(valuesData || []);
-        }
-      } catch (err: any) {
-        console.error('Error loading list data:', err);
-        setError(err.message || 'An error occurred loading the list');
-      } finally {
-        setLoading(false);
       }
-    };
-    
+      setError(null);
+      
+      // Fetch list
+      const listData = await listService.getListById(id as string);
+      if (!listData) throw new Error('List not found');
+      setList(listData);
+      
+      // Fetch entries
+      const entriesData = await entryService.getEntriesByListId(id as string);
+      setEntries(entriesData || []);
+      
+      // Fetch custom fields
+      const fieldsData = await customFieldService.getCustomFieldsByListId(id as string);
+      setCustomFields(fieldsData || []);
+      
+      // Fetch field values for all entries
+      if (entriesData && entriesData.length > 0) {
+        const entryIds = entriesData.map((entry: Tables['entries']) => entry.id);
+        const valuesData = await fieldValueService.getFieldValuesByEntryIds(entryIds);
+        setFieldValues(valuesData || []);
+      } else {
+        setFieldValues([]);
+      }
+    } catch (err: any) {
+      console.error('Error loading list data:', err);
+      setError(err.message || 'An error occurred loading the list');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+  
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData(true);
+  };
+  
+  // Initial data fetch and refresh when refreshTimestamp changes
+  useEffect(() => {
     fetchData();
-  }, [id]);
+    // Log refresh timestamp for debugging
+    if (refreshTimestamp > 0) {
+      console.log('List details refreshing due to context update:', refreshTimestamp);
+    }
+  }, [id, refreshTimestamp]);
+  
+  // Explicitly set empty title and headerTitle to override any default behavior
+  useEffect(() => {
+    router.setParams({
+      title: '',
+      headerTitle: ''
+    });
+  }, []);
 
   if (loading) {
     return (
@@ -74,7 +101,21 @@ export default function ListDetailScreen() {
 
   return (
     <SafeAreaView edges={['bottom']} className="flex-1 bg-gray-900">
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingBottom: 100 }}>
+      <ScrollView 
+        className="flex-1" 
+        contentContainerStyle={{ padding: 24, paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#60A5FA"
+            colors={["#60A5FA"]} // Android
+            progressBackgroundColor="#1F2937" // Android
+            title="Pull to refresh" // iOS
+            titleColor="#60A5FA" // iOS
+          />
+        }
+      >
         {/* Header */}
         <View className="flex-row items-center justify-between mb-6">
           <View className="mb-8">

@@ -1,9 +1,9 @@
-import { View, Text, ScrollView, ActivityIndicator, Alert, Pressable, TextInput } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, Alert, Pressable, TextInput, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { listService, customFieldService } from '../../services/supabaseService';
+import { listService, customFieldService, ratingSystemService, listRatingSettingsService } from '../../services/supabaseService';
 import { Tables } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { styled } from 'nativewind';
@@ -54,6 +54,35 @@ export default function CreateListScreen() {
   const [newOption, setNewOption] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Rating system states
+  const [ratingSystems, setRatingSystems] = useState<Tables['rating_systems'][]>([]);
+  const [selectedRatingSystem, setSelectedRatingSystem] = useState<Tables['rating_systems'] | null>(null);
+  const [showRatingSystemModal, setShowRatingSystemModal] = useState(false);
+  const [isLoadingRatingSystems, setIsLoadingRatingSystems] = useState(true);
+
+  // Fetch rating systems
+  useEffect(() => {
+    const fetchRatingSystems = async () => {
+      try {
+        setIsLoadingRatingSystems(true);
+        const systems = await ratingSystemService.getRatingSystems();
+        setRatingSystems(systems);
+        
+        // Default to the first rating system (Five Stars)
+        if (systems.length > 0) {
+          setSelectedRatingSystem(systems[0]);
+        }
+      } catch (err: any) {
+        console.error('Error fetching rating systems:', err);
+        setError('Failed to load rating systems');
+      } finally {
+        setIsLoadingRatingSystems(false);
+      }
+    };
+    
+    fetchRatingSystems();
+  }, []);
 
   // Handle adding a select option
   const handleAddOption = () => {
@@ -116,8 +145,15 @@ export default function CreateListScreen() {
 
   // Create the list in Supabase
   const handleCreateList = async () => {
+    // Debug logging for custom fields
+    console.log('Custom fields before creation:', customFields);
     if (!title.trim()) {
       Alert.alert('Error', 'List title cannot be empty');
+      return;
+    }
+
+    if (!selectedRatingSystem) {
+      Alert.alert('Error', 'Please select a rating system');
       return;
     }
 
@@ -133,6 +169,14 @@ export default function CreateListScreen() {
         is_public: false,
       });
 
+      // Create list rating settings
+      await listRatingSettingsService.createListRatingSettings({
+        list_id: newList.id,
+        rating_system_id: selectedRatingSystem.id,
+        is_required: true,
+        display_position: 0
+      });
+
       // Create custom fields for the list
       if (customFields.length > 0) {
         const fieldPromises = customFields.map(field => {
@@ -142,7 +186,7 @@ export default function CreateListScreen() {
             field_type_id: field.field_type_id,
             is_required: field.is_required,
             position: field.position,
-            options: field.field_type_id === 5 && field.options ? field.options : null,
+            options: field.options ? JSON.stringify(field.options) : null,
           });
         });
 
@@ -201,29 +245,51 @@ Details: ${err.details || 'None'}`
       <StyledScrollView className="flex-1 p-6">
         <StyledView className="flex-row items-center justify-between mb-8">
           <StyledText className="text-2xl font-bold text-white">Create New List</StyledText>
-          <Button variant="outline" onPress={() => router.back()}>
-            Cancel
-          </Button>
+          <Button variant="outline" onPress={() => router.back()}>Cancel</Button>
         </StyledView>
 
-        {/* List basic info */}
-        <Input
-          label="List Title"
-          placeholder="Enter list title"
-          value={title}
-          onChangeText={setTitle}
-          className="mb-4"
-        />
-
-        <Input
-          label="Description (Optional)"
-          placeholder="Enter description"
-          value={description}
-          onChangeText={setDescription}
-          className="mb-8"
-          multiline
-          numberOfLines={3}
-        />
+        {/* List details */}
+        <StyledView className="mb-6">
+          <StyledText className="text-lg font-bold mb-2 text-white">List Details</StyledText>
+          <Input
+            placeholder="List Title"
+            value={title}
+            onChangeText={setTitle}
+            className="mb-3"
+          />
+          <Input
+            placeholder="Description (optional)"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={3}
+            className="mb-3"
+          />
+          
+          {/* Rating System Selection */}
+          <StyledText className="text-base font-medium mb-2 text-white">Rating System</StyledText>
+          {isLoadingRatingSystems ? (
+            <ActivityIndicator size="small" color="#0ea5e9" />
+          ) : (
+            <StyledPressable 
+              className="flex-row items-center justify-between p-3 bg-gray-800 rounded-md mb-3"
+              onPress={() => setShowRatingSystemModal(true)}
+            >
+              <StyledText className="text-white">
+                {selectedRatingSystem ? selectedRatingSystem.name : 'Select a rating system'}
+              </StyledText>
+              <MaterialCommunityIcons name="chevron-down" size={24} color="#ffffff" />
+            </StyledPressable>
+          )}
+          
+          {selectedRatingSystem && (
+            <StyledView className="bg-gray-800 p-3 rounded-md mb-3">
+              <StyledText className="text-white mb-1">Range: {selectedRatingSystem.min_value} to {selectedRatingSystem.max_value}</StyledText>
+              <StyledText className="text-white mb-1">Step: {selectedRatingSystem.step_value}</StyledText>
+              <StyledText className="text-white">Display: {selectedRatingSystem.display_type}</StyledText>
+            </StyledView>
+          )}
+        </StyledView>
 
         {/* Custom Fields Section */}
         <StyledView className="mb-8">
@@ -258,7 +324,7 @@ Details: ${err.details || 'None'}`
                     <StyledText className="text-gray-400 text-sm mt-1">
                       {fieldTypes.find(t => t.id === field.field_type_id)?.label}
                     </StyledText>
-                    {field.field_type_id === 5 && field.options && field.options.length > 0 && (
+                    {(field.field_type_id === 5 || field.field_type_id === 6) && field.options && field.options.length > 0 && (
                       <StyledView className="mt-2 pl-2 border-l-2 border-gray-700">
                         <StyledText className="text-gray-500 text-xs mb-1">Options:</StyledText>
                         {field.options.map((option, idx) => (
@@ -410,6 +476,54 @@ Details: ${err.details || 'None'}`
           </Button>
         )}
       </StyledScrollView>
+
+      {/* Rating System Selection Modal */}
+      <Modal
+        visible={showRatingSystemModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowRatingSystemModal(false)}
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-gray-900 rounded-t-xl p-4">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-white text-lg font-bold">Select Rating System</Text>
+              <Pressable onPress={() => setShowRatingSystemModal(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#ffffff" />
+              </Pressable>
+            </View>
+            
+            <ScrollView className="max-h-96">
+              {ratingSystems.map((system) => (
+                <Pressable
+                  key={system.id}
+                  className={`p-4 border-b border-gray-800 ${selectedRatingSystem?.id === system.id ? 'bg-blue-900/30' : ''}`}
+                  onPress={() => {
+                    setSelectedRatingSystem(system);
+                    setShowRatingSystemModal(false);
+                  }}
+                >
+                  <Text className="text-white font-medium mb-1">{system.name}</Text>
+                  <Text className="text-gray-400 text-sm">
+                    Range: {system.min_value} to {system.max_value}, Step: {system.step_value}
+                  </Text>
+                  <Text className="text-gray-400 text-sm">
+                    Display Type: {system.display_type}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            
+            <Button 
+              variant="primary" 
+              onPress={() => setShowRatingSystemModal(false)}
+              className="mt-4"
+            >
+              Done
+            </Button>
+          </View>
+        </View>
+      </Modal>
     </StyledSafeAreaView>
   );
 }

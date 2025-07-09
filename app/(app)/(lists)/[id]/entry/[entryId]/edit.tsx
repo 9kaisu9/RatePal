@@ -2,14 +2,16 @@ import { View, Text, TextInput, ScrollView, KeyboardAvoidingView, Platform, Acti
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useRefresh } from '../../../../../../lib/RefreshContext';
 import { Button } from '../../../../../components/ui/Button';
 import { Input } from '../../../../../components/ui/Input';
 import { useState, useEffect } from 'react';
-import { listService, customFieldService, entryService, fieldValueService } from '../../../../../services/supabaseService';
+import { listService, customFieldService, entryService, fieldValueService, listRatingSettingsService, ratingSystemService } from '../../../../../services/supabaseService';
 import { Tables } from '../../../../../lib/supabase';
 import { useAuth } from '../../../../../context/AuthContext';
 import { styled } from 'nativewind';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Slider from '@react-native-community/slider';
 
 // Default guest user ID
 const GUEST_USER_ID = '00000000-0000-0000-0000-000000000000';
@@ -47,6 +49,7 @@ type FormData = {
 export default function EditEntryScreen() {
   const { id, entryId } = useLocalSearchParams();
   const { session } = useAuth();
+  const { triggerRefresh } = useRefresh();
   const [entry, setEntry] = useState<Tables['entries'] | null>(null);
   const [list, setList] = useState<Tables['lists'] | null>(null);
   const [customFields, setCustomFields] = useState<Tables['custom_fields'][]>([]);
@@ -59,6 +62,10 @@ export default function EditEntryScreen() {
   const [selectedDate, setSelectedDate] = useState<Record<string, string>>({});
   const [selectedTags, setSelectedTags] = useState<Record<string, string[]>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Rating system states
+  const [ratingSystem, setRatingSystem] = useState<Tables['rating_systems'] | null>(null);
+  const [listRatingSettings, setListRatingSettings] = useState<Tables['list_rating_settings'] | null>(null);
   
   const [formData, setFormData] = useState<FormData>({
     title: '',
@@ -103,11 +110,21 @@ export default function EditEntryScreen() {
         const fieldsData = await customFieldService.getCustomFieldsByListId(id);
         setCustomFields(fieldsData);
         
-        // Fetch field values for this entry
-        const fieldValueData = await fieldValueService.getFieldValuesByEntryId(entryId);
-        setFieldValues(fieldValueData);
+        // Fetch list rating settings
+        const ratingSettingsData = await listRatingSettingsService.getListRatingSettings(id);
+        setListRatingSettings(ratingSettingsData);
         
-        // Populate form data with entry details
+        // Fetch rating system
+        if (ratingSettingsData) {
+          const ratingSystemData = await ratingSystemService.getRatingSystemById(ratingSettingsData.rating_system_id);
+          setRatingSystem(ratingSystemData);
+        }
+        
+        // Fetch field values for this entry
+        const valuesData = await fieldValueService.getFieldValuesByEntryId(entryId);
+        setFieldValues(valuesData);
+        
+        // Initialize form data with entry values
         const initialFormData: FormData = {
           title: entryData.title || '',
           description: entryData.description || '',
@@ -115,29 +132,32 @@ export default function EditEntryScreen() {
         };
         
         // Add field values to form data
-        fieldValueData.forEach(fieldValue => {
-          const field = fieldsData.find(f => f.id === fieldValue.field_id);
-          if (!field) return;
-          
-          if (field.field_type_id === FIELD_TYPES.TEXT || field.field_type_id === FIELD_TYPES.SELECT) {
-            initialFormData[fieldValue.field_id] = fieldValue.value_text || '';
-          } else if (field.field_type_id === FIELD_TYPES.NUMBER) {
-            initialFormData[fieldValue.field_id] = fieldValue.value_number?.toString() || '';
-          } else if (field.field_type_id === FIELD_TYPES.DATE) {
-            const dateValue = fieldValue.value_date || '';
-            initialFormData[fieldValue.field_id] = dateValue;
-            if (dateValue) {
-              setSelectedDate(prev => ({ ...prev, [fieldValue.field_id]: dateValue }));
+        valuesData.forEach(value => {
+          const field = fieldsData.find(f => f.id === value.field_id);
+          if (field) {
+            if (field.field_type_id === FIELD_TYPES.BOOLEAN) {
+              initialFormData[field.id] = value.value_boolean === true;
+            } else if (field.field_type_id === FIELD_TYPES.MULTI_SELECT) {
+              // For multi-select, store the comma-separated values
+              initialFormData[field.id] = value.value_text || '';
+              
+              // Also initialize the selectedTags state
+              if (value.value_text) {
+                const tags = value.value_text.split(',').map((tag: string) => tag.trim()).filter(Boolean);
+                setSelectedTags(prev => ({ ...prev, [field.id]: tags }));
+              }
+            } else if (field.field_type_id === FIELD_TYPES.DATE) {
+              initialFormData[field.id] = value.value_date || '';
+              
+              // For date fields, also set the selectedDate state
+              if (value.value_date) {
+                setSelectedDate(prev => ({ ...prev, [field.id]: value.value_date || '' }));
+              }
+            } else if (field.field_type_id === FIELD_TYPES.NUMBER) {
+              initialFormData[field.id] = value.value_number?.toString() || '';
+            } else {
+              initialFormData[field.id] = value.value_text || '';
             }
-          } else if (field.field_type_id === FIELD_TYPES.BOOLEAN) {
-            initialFormData[fieldValue.field_id] = fieldValue.value_boolean || false;
-          } else if (field.field_type_id === FIELD_TYPES.MULTI_SELECT && fieldValue.value_text) {
-            initialFormData[fieldValue.field_id] = fieldValue.value_text;
-            const tagArray = fieldValue.value_text ? fieldValue.value_text.split(',') : [];
-            setSelectedTags(prev => ({ 
-              ...prev, 
-              [fieldValue.field_id]: tagArray 
-            }));
           }
         });
         
@@ -153,6 +173,127 @@ export default function EditEntryScreen() {
     fetchData();
   }, [id, entryId]);
 
+  // Render rating input based on rating system type
+  const renderRatingInput = () => {
+    if (!ratingSystem) {
+      return (
+        <Input
+          label="Rating (1-5)"
+          placeholder="Enter rating"
+          value={formData.rating}
+          onChangeText={(text) => {
+            setFormData(prev => ({ ...prev, rating: text }));
+            if (errors.rating) setErrors(prev => ({ ...prev, rating: '' }));
+          }}
+          keyboardType="numeric"
+          error={errors.rating}
+          className="bg-gray-800/50 backdrop-blur-sm border-gray-700/50 rounded-xl px-4 py-3"
+        />
+      );
+    }
+    
+    const { min_value, max_value, step_value, display_type } = ratingSystem;
+    const currentValue = parseFloat(formData.rating) || min_value;
+    
+    switch (display_type) {
+      case 'stars':
+        // Star rating display
+        return (
+          <View className="mb-4">
+            <Text className="text-white text-base font-medium mb-2">Rating</Text>
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row">
+                {Array.from({ length: 5 }).map((_, index) => {
+                  const starValue = min_value + (index * ((max_value - min_value) / 4));
+                  const isFilled = currentValue >= starValue;
+                  return (
+                    <Pressable 
+                      key={index}
+                      onPress={() => {
+                        const newValue = starValue;
+                        setFormData(prev => ({ ...prev, rating: newValue.toString() }));
+                        if (errors.rating) setErrors(prev => ({ ...prev, rating: '' }));
+                      }}
+                      className="p-1"
+                    >
+                      <MaterialCommunityIcons 
+                        name={isFilled ? "star" : "star-outline"} 
+                        size={32} 
+                        color={isFilled ? "#F59E0B" : "#6B7280"} 
+                      />
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text className="text-white text-lg">{currentValue}</Text>
+            </View>
+            {errors.rating && <Text className="text-red-500 text-sm mt-1">{errors.rating}</Text>}
+          </View>
+        );
+        
+      case 'emoji':
+        // Emoji rating display
+        const emojis = ['😢', '😕', '😐', '🙂', '😄'];
+        return (
+          <View className="mb-4">
+            <Text className="text-white text-base font-medium mb-2">Rating</Text>
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row">
+                {emojis.map((emoji, index) => {
+                  const emojiValue = min_value + (index * ((max_value - min_value) / 4));
+                  const isSelected = Math.abs(currentValue - emojiValue) < step_value;
+                  return (
+                    <Pressable 
+                      key={index}
+                      onPress={() => {
+                        setFormData(prev => ({ ...prev, rating: emojiValue.toString() }));
+                        if (errors.rating) setErrors(prev => ({ ...prev, rating: '' }));
+                      }}
+                      className={`p-2 rounded-full ${isSelected ? 'bg-blue-500/30' : ''}`}
+                    >
+                      <Text className="text-3xl">{emoji}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text className="text-white text-lg">{currentValue}</Text>
+            </View>
+            {errors.rating && <Text className="text-red-500 text-sm mt-1">{errors.rating}</Text>}
+          </View>
+        );
+        
+      case 'slider':
+      case 'percentage':
+      default:
+        // Slider or numeric input
+        return (
+          <View className="mb-4">
+            <Text className="text-white text-base font-medium mb-2">Rating ({min_value} to {max_value})</Text>
+            <Slider
+              minimumValue={min_value}
+              maximumValue={max_value}
+              step={step_value}
+              value={currentValue}
+              onValueChange={(value) => {
+                setFormData(prev => ({ ...prev, rating: value.toString() }));
+                if (errors.rating) setErrors(prev => ({ ...prev, rating: '' }));
+              }}
+              minimumTrackTintColor="#3B82F6"
+              maximumTrackTintColor="#4B5563"
+              thumbTintColor="#60A5FA"
+              className="mb-2"
+            />
+            <View className="flex-row justify-between">
+              <Text className="text-gray-400">{min_value}</Text>
+              <Text className="text-white font-medium">{currentValue}</Text>
+              <Text className="text-gray-400">{max_value}</Text>
+            </View>
+            {errors.rating && <Text className="text-red-500 text-sm mt-1">{errors.rating}</Text>}
+          </View>
+        );
+    }
+  };
+
   const validateForm = () => {
     const newErrors: FormErrors = {};
 
@@ -164,6 +305,11 @@ export default function EditEntryScreen() {
     // Validate rating
     if (!formData.rating) {
       newErrors.rating = 'Rating is required';
+    } else if (ratingSystem) {
+      const ratingValue = parseFloat(formData.rating);
+      if (isNaN(ratingValue) || ratingValue < ratingSystem.min_value || ratingValue > ratingSystem.max_value) {
+        newErrors.rating = `Rating must be between ${ratingSystem.min_value} and ${ratingSystem.max_value}`;
+      }
     } else {
       const ratingValue = parseFloat(formData.rating);
       if (isNaN(ratingValue) || ratingValue < 1 || ratingValue > 5) {
@@ -267,9 +413,14 @@ export default function EditEntryScreen() {
       });
       
       await Promise.all(fieldValuePromises);
-      
-      setIsSubmitting(false);
-      router.back();
+    
+    setIsSubmitting(false);
+    
+    // Trigger a refresh for all screens using the refresh context
+    triggerRefresh();
+    console.log('Triggered refresh after saving entry');
+    
+    router.back();
     } catch (err: any) {
       console.error('Error saving entry:', err);
       setIsSubmitting(false);
@@ -394,27 +545,7 @@ export default function EditEntryScreen() {
               numberOfLines={3}
             />
             
-            <View className="mb-4">
-              <StyledText className="text-white text-base mb-2">Rating</StyledText>
-              <View className="flex-row items-center">
-                {[1, 2, 3, 4, 5].map(rating => (
-                  <StyledPressable
-                    key={rating}
-                    onPress={() => setFormData(prev => ({ ...prev, rating: rating.toString() }))}
-                    className="mr-2"
-                  >
-                    <MaterialCommunityIcons
-                      name={parseFloat(formData.rating) >= rating ? 'star' : 'star-outline'}
-                      size={32}
-                      color={parseFloat(formData.rating) >= rating ? '#FCD34D' : '#6B7280'}
-                    />
-                  </StyledPressable>
-                ))}
-              </View>
-              {errors.rating && (
-                <StyledText className="text-red-500 mt-1">{errors.rating}</StyledText>
-              )}
-            </View>
+            {renderRatingInput()}
           </View>
 
           {/* Custom fields */}
@@ -508,9 +639,42 @@ export default function EditEntryScreen() {
                   );
                   
                 case FIELD_TYPES.SELECT:
-                  const selectOptions = field.options ? 
-                    (typeof field.options === 'string' ? field.options.split(',') : field.options) : 
-                    [];
+                  // Parse options for select fields
+                  let selectOptions: string[] = [];
+                  if (field.options) {
+                    try {
+                      // If options is a string, try to parse it as JSON
+                      if (typeof field.options === 'string') {
+                        try {
+                          const parsedOptions = JSON.parse(field.options);
+                          if (Array.isArray(parsedOptions)) {
+                            selectOptions = parsedOptions;
+                          } else if (typeof parsedOptions === 'object' && parsedOptions !== null && Array.isArray(parsedOptions.options)) {
+                            // Handle legacy format where options might be stored as { options: [...] }
+                            selectOptions = parsedOptions.options;
+                          } else {
+                            // Fallback to comma-separated string
+                            selectOptions = field.options.split(',').map(opt => opt.trim());
+                          }
+                        } catch (e) {
+                          console.log('JSON parse error for select field:', e);
+                          // If JSON parsing fails, treat as comma-separated string
+                          selectOptions = field.options.split(',').map(opt => opt.trim());
+                        }
+                      } 
+                      // If options is already an array, use it directly
+                      else if (Array.isArray(field.options)) {
+                        selectOptions = field.options;
+                      }
+                    } catch (e) {
+                      console.error('Error parsing select options:', e);
+                    }
+                  }
+                  
+                  // Debug output
+                  console.log('Field options type for select:', typeof field.options);
+                  console.log('Field options value for select:', field.options);
+                  console.log('Parsed select options:', selectOptions);
                   
                   return (
                     <View key={field.id} className="mb-4">
@@ -551,7 +715,9 @@ export default function EditEntryScreen() {
                               
                               <View className="bg-gray-700 rounded-xl mb-4 max-h-80">
                                 <ScrollView>
-                                  {selectOptions.map((option: string, index: number) => (
+                                  {/* Debug log for select options */}
+                                  {(() => { console.log('Rendering select options in modal:', selectOptions); return null; })()}
+                                  {selectOptions && selectOptions.length > 0 ? selectOptions.map((option: string, index: number) => (
                                     <StyledPressable
                                       key={index}
                                       onPress={() => {
@@ -563,7 +729,11 @@ export default function EditEntryScreen() {
                                     >
                                       <StyledText className="text-white">{option.trim()}</StyledText>
                                     </StyledPressable>
-                                  ))}
+                                  )) : (
+                                    <View className="p-4">
+                                      <StyledText className="text-gray-400 text-center">No options available</StyledText>
+                                    </View>
+                                  )}
                                 </ScrollView>
                               </View>
                               
@@ -582,13 +752,46 @@ export default function EditEntryScreen() {
                   );
                   
                 case FIELD_TYPES.MULTI_SELECT:
-                  const multiSelectOptions = field.options ? 
-                    (typeof field.options === 'string' ? field.options.split(',') : field.options) : 
-                    [];
+                  // Ensure multiSelectOptions is always an array
+                  let multiSelectOptions: string[] = [];
+                  if (field.options) {
+                    try {
+                      // If options is a string, try to parse it as JSON
+                      if (typeof field.options === 'string') {
+                        try {
+                          const parsedOptions = JSON.parse(field.options);
+                          if (Array.isArray(parsedOptions)) {
+                            multiSelectOptions = parsedOptions;
+                          } else if (typeof parsedOptions === 'object' && parsedOptions !== null && Array.isArray(parsedOptions.options)) {
+                            // Handle legacy format where options might be stored as { options: [...] }
+                            multiSelectOptions = parsedOptions.options;
+                          } else {
+                            // Fallback to comma-separated string
+                            multiSelectOptions = field.options.split(',').map(opt => opt.trim());
+                          }
+                        } catch (e) {
+                          console.log('JSON parse error:', e);
+                          // If JSON parsing fails, treat as comma-separated string
+                          multiSelectOptions = field.options.split(',').map(opt => opt.trim());
+                        }
+                      } 
+                      // If options is already an array, use it directly
+                      else if (Array.isArray(field.options)) {
+                        multiSelectOptions = field.options;
+                      }
+                    } catch (e) {
+                      console.error('Error parsing multi-select options:', e);
+                    }
+                  }
+                  
+                  // Debug output
+                  console.log('Field options type:', typeof field.options);
+                  console.log('Field options value:', field.options);
+                  console.log('Parsed multi-select options:', multiSelectOptions);
                   
                   // Get selected options as array
                   const selectedOptions = formData[field.id] ? 
-                    (typeof formData[field.id] === 'string' ? String(formData[field.id]).split(',') : []) : 
+                    (typeof formData[field.id] === 'string' ? String(formData[field.id]).split(',').map(opt => opt.trim()) : []) : 
                     [];
                   
                   return (
